@@ -527,6 +527,8 @@ class LoadImagesAndLabels(Dataset):
         self.path = path
         self.albumentations = Albumentations(size=img_size) if augment else None
 
+        print('Creating dataset for {} ({})'.format(str(path),prefix))
+        
         try:
             f = []  # image files
             for p in path if isinstance(path, list) else [path]:
@@ -548,9 +550,18 @@ class LoadImagesAndLabels(Dataset):
         except Exception as e:
             raise Exception(f"{prefix}Error loading data from {path}: {e}\n{HELP_URL}") from e
 
+        print('Found {} images'.format(len(self.im_files)))
+        
         # Check cache
         self.label_files = img2label_paths(self.im_files)  # labels
-        cache_path = (p if p.is_file() else Path(self.label_files[0]).parent).with_suffix(".cache")
+        # cache_path = (p if p.is_file() else Path(self.label_files[0]).parent).with_suffix(".cache")
+        cache_base = str(p)
+        if cache_base.endswith('/') or cache_base.endswith('\\'):
+            cache_base = cache_base[0:-1]
+        cache_path = (cache_base) + '.cache'
+        cache_path = Path(cache_path)
+        print('Writing cache for {} to {}'.format(prefix,str(cache_path)))
+        
         try:
             cache, exists = np.load(cache_path, allow_pickle=True).item(), True  # load dict
             assert cache["version"] == self.cache_version  # matches current version
@@ -688,6 +699,7 @@ class LoadImagesAndLabels(Dataset):
                 bar_format=TQDM_BAR_FORMAT,
             )
             for im_file, lb, shape, segments, nm_f, nf_f, ne_f, nc_f, msg in pbar:
+                print('Preparing cache for image {}'.format(im_file))
                 nm += nm_f
                 nf += nf_f
                 ne += ne_f
@@ -697,7 +709,6 @@ class LoadImagesAndLabels(Dataset):
                 if msg:
                     msgs.append(msg)
                 pbar.desc = f"{desc} {nf} images, {nm + ne} backgrounds, {nc} corrupt"
-
         pbar.close()
         if msgs:
             LOGGER.info("\n".join(msgs))
